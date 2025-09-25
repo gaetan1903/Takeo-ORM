@@ -1,0 +1,2 @@
+gopy>=0.4.7
+typing-extensions>=4.0.0
