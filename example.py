@@ -10,9 +10,12 @@ from pathlib import Path
 # Load environment variables from .env file
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
-    print("[Warning] python-dotenv not installed, using system environment variables only")
+    print(
+        "[Warning] python-dotenv not installed, using system environment variables only"
+    )
 
 # Ajouter le dossier python à sys.path
 repo_root = Path(__file__).parent.resolve()
