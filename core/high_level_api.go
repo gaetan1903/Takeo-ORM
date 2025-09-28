@@ -74,16 +74,23 @@ func (tm *TakeoManager) RegisterEntity(name, tableName string, columns map[strin
 	return nil
 }
 
-// Save sauvegarde une entité et retourne son ID
+// Save sauvegarde une entité et retourne son ID - OPTIMISÉ avec prepared statements
 func (tm *TakeoManager) Save(entityType string, entityData map[string]interface{}) (int64, error) {
 	metadata, exists := tm.registry.GetEntity(entityType)
 	if !exists {
 		return 0, fmt.Errorf("entity %s not registered", entityType)
 	}
 
+	// Use prepared statement for better performance
 	query := metadata.BuildInsertQuery() + " RETURNING " + metadata.PrimaryKey
-	var queryValues []interface{}
+	stmtKey := fmt.Sprintf("insert_%s", entityType)
+	
+	stmt, err := tm.db.GetOrCreatePreparedStmt(stmtKey, query)
+	if err != nil {
+		return 0, err
+	}
 
+	var queryValues []interface{}
 	for _, colName := range metadata.ColumnOrder {
 		col := metadata.Columns[colName]
 		if !col.IsAutoIncrement {
@@ -94,11 +101,11 @@ func (tm *TakeoManager) Save(entityType string, entityData map[string]interface{
 	}
 
 	var id int64
-	err := tm.db.conn.QueryRow(query, queryValues...).Scan(&id)
+	err = stmt.QueryRow(queryValues...).Scan(&id)
 	return id, err
 }
 
-// SaveBatch sauvegarde plusieurs entités en une transaction et retourne leurs IDs
+// SaveBatch sauvegarde plusieurs entités en une transaction avec INSERT batch optimisé
 func (tm *TakeoManager) SaveBatch(entityType string, entitiesData []map[string]interface{}) ([]int64, error) {
 	if len(entitiesData) == 0 {
 		return nil, nil
@@ -116,30 +123,51 @@ func (tm *TakeoManager) SaveBatch(entityType string, entitiesData []map[string]i
 	}
 	defer tx.Rollback()
 
-	// Prepare statement with RETURNING clause
-	query := metadata.BuildInsertQuery() + " RETURNING " + metadata.PrimaryKey
-	stmt, err := tx.Prepare(query)
+	// Build batch INSERT with VALUES clause for better performance
+	nonAutoColumns := []string{}
+	for _, colName := range metadata.ColumnOrder {
+		col := metadata.Columns[colName]
+		if !col.IsAutoIncrement {
+			nonAutoColumns = append(nonAutoColumns, colName)
+		}
+	}
+
+	// Build batch INSERT query
+	tableName := metadata.TableName
+	columnsList := strings.Join(nonAutoColumns, ", ")
+	
+	// Create placeholders for batch insert: ($1, $2), ($3, $4), ...
+	var valuePlaceholders []string
+	var allValues []interface{}
+	
+	placeholderIndex := 1
+	for _, entityData := range entitiesData {
+		var rowPlaceholders []string
+		for _, colName := range nonAutoColumns {
+			if val, exists := entityData[colName]; exists {
+				allValues = append(allValues, val)
+				rowPlaceholders = append(rowPlaceholders, fmt.Sprintf("$%d", placeholderIndex))
+				placeholderIndex++
+			}
+		}
+		valuePlaceholders = append(valuePlaceholders, "("+strings.Join(rowPlaceholders, ", ")+")")
+	}
+
+	// Build final batch query
+	batchQuery := fmt.Sprintf("INSERT INTO %s (%s) VALUES %s RETURNING %s", 
+		tableName, columnsList, strings.Join(valuePlaceholders, ", "), metadata.PrimaryKey)
+
+	// Execute batch insert
+	rows, err := tx.Query(batchQuery, allValues...)
 	if err != nil {
 		return nil, err
 	}
-	defer stmt.Close()
+	defer rows.Close()
 
 	var ids []int64
-
-	// Execute for each entity
-	for _, entityData := range entitiesData {
-		var queryValues []interface{}
-		for _, colName := range metadata.ColumnOrder {
-			col := metadata.Columns[colName]
-			if !col.IsAutoIncrement {
-				if val, exists := entityData[colName]; exists {
-					queryValues = append(queryValues, val)
-				}
-			}
-		}
-
+	for rows.Next() {
 		var id int64
-		if err := stmt.QueryRow(queryValues...).Scan(&id); err != nil {
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
 		ids = append(ids, id)
@@ -181,15 +209,23 @@ func (tm *TakeoManager) FindByID(entityType string, id int64) (map[string]interf
 	return result, nil
 }
 
-// FindAll trouve toutes les entités d'un type
+// FindAll trouve toutes les entités d'un type - OPTIMISÉ avec prepared statements
 func (tm *TakeoManager) FindAll(entityType string) ([]map[string]interface{}, error) {
 	metadata, exists := tm.registry.GetEntity(entityType)
 	if !exists {
 		return nil, fmt.Errorf("entity %s not registered", entityType)
 	}
 
+	// Use prepared statement for better performance
 	query := metadata.BuildSelectQuery()
-	rows, err := tm.db.conn.Query(query)
+	stmtKey := fmt.Sprintf("findall_%s", entityType)
+	
+	stmt, err := tm.db.GetOrCreatePreparedStmt(stmtKey, query)
+	if err != nil {
+		return nil, err
+	}
+	
+	rows, err := stmt.Query()
 	if err != nil {
 		return nil, err
 	}

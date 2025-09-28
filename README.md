@@ -2,13 +2,14 @@
 
 # 🚀 Takeo-ORM
 
-**The Fastest Python ORM** • *TypeORM Syntax + Go Performance*
+**High-Performance Python ORM** • *TypeORM Syntax + Go Backend*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![Go 1.19+](https://img.shields.io/badge/go-1.19+-00ADD8.svg)](https://golang.org/)
+[![Development Status](https://img.shields.io/badge/Status-Active%20Development-orange.svg)]()
 
-*Familiar TypeORM decorators powered by blazing-fast Go backend*
+*Familiar TypeORM decorators with Go backend optimization*
 
 </div>
 
@@ -28,10 +29,11 @@
 </td>
 <td width="50%">
 
-### 🚀 **Performance**
-- ⚡ **25x faster** than SQLAlchemy
-- 🔥 **Native Go backend** - zero Python overhead
-- 🏆 **Optimized queries** and connection pooling
+### 🚀 **Performance Goals**
+- 🎯 **Aiming to be fastest** Python ORM
+- 🔥 **Native Go backend** with optimized queries
+- 🏆 **Prepared statements** and connection pooling
+- 📊 **Transparent benchmarks** - see real performance below
 
 </td>
 </tr>
@@ -75,12 +77,31 @@ cp .env.example .env  # Edit with your DB settings
 python example.py
 ```
 
-## 📊 Performance
+## 📊 Performance Benchmarks
 
-| Operation | Takeo-ORM | SQLAlchemy | Performance Gain |
-|-----------|-----------|------------|------------------|
-| **Insert 1K records** | 50ms | 1,200ms | **24x faster** |
-| **Read 1K records** | 30ms | 800ms | **26x faster** |
+*Real performance results (10,000 records, 5 iterations on PostgreSQL):*
+
+| Operation | Takeo-ORM | SQLAlchemy | Current Status |
+|-----------|-----------|------------|----------------|
+| **INSERT 10K records** | 17,950ms | 1,147ms | **15.7x slower** ⚠️ |
+| **READ 10K records** | 87ms | 148ms | **1.7x faster** ✅ |
+| **UPDATE operations** | 190ms | 129ms | **1.5x slower** ⚠️ |
+| **DELETE operations** | 169ms | 220ms | **1.3x faster** ✅ |
+
+### 🎯 **Current Performance Profile**
+- ✅ **READ operations**: **70% faster** than SQLAlchemy
+- ✅ **DELETE operations**: **30% faster** than SQLAlchemy  
+- ⚠️ **INSERT operations**: **15x slower** due to gopy communication overhead
+- ⚠️ **UPDATE operations**: **50% slower** due to individual API calls
+- 🚧 **Overall**: Currently optimized for read-heavy workloads
+
+### 📈 **Performance Analysis**
+- **Strong suit**: Query operations (SELECT, DELETE)
+- **Bottleneck**: Write operations due to Python ↔ Go bindings
+- **Best use case**: Read-heavy applications, data analytics
+- **Avoid for**: High-frequency writes, bulk data ingestion
+
+*Run `python benchmark.py` to verify these results on your system.*
 
 ## 🛠️ API Reference
 
@@ -101,13 +122,43 @@ repo.update(1, changes)         # Partial update
 repo.delete(1)                  # Delete by ID
 ```
 
+## 🚧 Development Roadmap
+
+### **🎯 Performance Goals**
+Our goal is to become the fastest Python ORM. Current challenges and solutions:
+
+**Current Bottlenecks:**
+- 🔧 **gopy bindings overhead** (99.9% of execution time)
+- 📡 **JSON serialization** between Python ↔ Go
+- 🔄 **Individual API calls** instead of batch operations
+
+**Planned Optimizations:**
+- 🚀 **gRPC communication** replacing gopy bindings
+- 🗜️ **Protocol Buffers** for binary serialization
+- ⚡ **True batch operations** with single database round-trips
+- 🔄 **Connection pooling** and prepared statement caching
+
+### **✅ Recent Improvements**
+- 📈 **18% faster READ operations** vs SQLAlchemy
+- 🔧 **Prepared statements pool** for query optimization
+- ⚡ **orjson integration** for faster JSON processing
+- 🗃️ **Optimized entity conversions** with caching
+
 ## 🤝 Contributing
+
+Help us reach our performance goals!
 
 ```bash
 git clone <your-fork>
 ./build.sh              # Build bindings
+python benchmark.py     # Run performance tests
 python -m pytest tests/ # Run tests
 ```
+
+**Priority Areas:**
+- 🚀 gRPC/Protobuf implementation
+- ⚡ Batch operation optimization  
+- 📊 More comprehensive benchmarks
 
 ## 📄 License
 

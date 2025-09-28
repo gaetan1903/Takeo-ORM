@@ -45,6 +45,28 @@ func (api *TakeoAPI) Save(entityType string, dataJSON string) (int64, error) {
 	return api.manager.Save(entityType, entityData)
 }
 
+// SaveBatch sauvegarde plusieurs entités en batch (version optimisée)
+func (api *TakeoAPI) SaveBatch(entityType string, entitiesJSON string) (string, error) {
+	// Parser le JSON pour récupérer les données des entités
+	var entitiesData []map[string]interface{}
+	if err := json.Unmarshal([]byte(entitiesJSON), &entitiesData); err != nil {
+		return "", fmt.Errorf("failed to parse entities JSON: %v", err)
+	}
+	
+	ids, err := api.manager.SaveBatch(entityType, entitiesData)
+	if err != nil {
+		return "", err
+	}
+	
+	// Retourner les IDs en JSON
+	idsJSON, err := json.Marshal(ids)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal IDs: %v", err)
+	}
+	
+	return string(idsJSON), nil
+}
+
 // FindByID trouve une entité par ID (retourne JSON string pour simplicité)
 func (api *TakeoAPI) FindByID(entityType string, id int64) (string, error) {
 	result, err := api.manager.FindByID(entityType, id)

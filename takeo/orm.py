@@ -3,7 +3,32 @@ Takeo-ORM - TypeORM-like API for Python
 High-performance ORM with Go backend and TypeORM-inspired syntax
 """
 
-import json
+try:
+    import orjson
+
+    # Optimize: avoid decode() when possible, work with bytes directly when Go API accepts it
+    def json_dumps(obj):
+        # Return bytes directly - Go can handle bytes
+        result = orjson.dumps(obj)
+        # Only decode if we need string (for now, keep compatibility)
+        return result.decode("utf-8")
+
+    def json_loads(s):
+        # Handle both bytes and str input
+        if isinstance(s, str):
+            s = s.encode("utf-8")
+        return orjson.loads(s)
+
+except ImportError:
+    import json
+
+    def json_dumps(obj):
+        return json.dumps(obj)
+
+    def json_loads(s):
+        return json.loads(s)
+
+
 from typing import Dict, List, Any, Optional, Type
 from .core import core
 
@@ -111,7 +136,7 @@ class TakeoPyTypeORM:
                 columns_dict[col_meta["name"]] = col_meta["type"]
 
             # Enregistrer dans l'API Go
-            columns_json = json.dumps(columns_dict)
+            columns_json = json_dumps(columns_dict)
             self._api.RegisterEntity(
                 entity_class.__name__,
                 entity_class._takeo_table_name,
@@ -136,7 +161,7 @@ class Repository:
     def save(self, entity) -> Any:
         """Sauvegarde une entité (style TypeORM)"""
         entity_data = self._entity_to_dict(entity)
-        entity_json = json.dumps(entity_data)
+        entity_json = json_dumps(entity_data)
 
         save_result = self._api.Save(self.entity_class.__name__, entity_json)
         if isinstance(save_result, tuple):
@@ -151,6 +176,50 @@ class Repository:
             if hasattr(entity, self.entity_class._takeo_primary_key):
                 setattr(entity, self.entity_class._takeo_primary_key, save_result)
             return entity
+
+    def saveBatch(self, entities: List[Any]) -> List[Any]:
+        """Sauvegarde multiple entités en une seule transaction - OPTIMISÉ"""
+        if not entities:
+            return []
+
+        # Convert all entities to dicts in one go
+        entities_data = []
+        for entity in entities:
+            entity_data = self._entity_to_dict(entity)
+            entities_data.append(entity_data)
+
+        # Single JSON serialization for all entities
+        batch_json = json_dumps(entities_data)
+
+        # Single API call instead of N calls
+        try:
+            # Use SaveBatch if available, otherwise fallback to individual saves
+            if hasattr(self._api, "SaveBatch"):
+                batch_result = self._api.SaveBatch(
+                    self.entity_class.__name__, batch_json
+                )
+                # Parse batch results and update entity IDs
+                if isinstance(batch_result, str):
+                    ids = json_loads(batch_result)
+                    for i, entity_id in enumerate(ids):
+                        if i < len(entities) and hasattr(
+                            entities[i], self.entity_class._takeo_primary_key
+                        ):
+                            setattr(
+                                entities[i],
+                                self.entity_class._takeo_primary_key,
+                                entity_id,
+                            )
+            else:
+                # Fallback to individual saves (still faster due to optimized conversions)
+                for entity in entities:
+                    self.save(entity)
+        except Exception as e:
+            # Fallback to individual saves on error
+            for entity in entities:
+                self.save(entity)
+
+        return entities
 
     def findOne(self, id: int) -> Optional[Any]:
         """Trouve une entité par ID (style TypeORM)"""
@@ -168,7 +237,7 @@ class Repository:
 
         if json_to_parse:
             try:
-                data = json.loads(json_to_parse)
+                data = json_loads(json_to_parse)
                 return self._dict_to_entity(data)
             except json.JSONDecodeError as e:
                 raise Exception(f"JSON decode error: {e}")
@@ -190,7 +259,7 @@ class Repository:
 
         if json_to_parse:
             try:
-                data = json.loads(json_to_parse)
+                data = json_loads(json_to_parse)
                 if isinstance(data, list):
                     return [self._dict_to_entity(item) for item in data]
             except json.JSONDecodeError as e:
@@ -199,7 +268,7 @@ class Repository:
 
     def update(self, id: int, update_data: Dict[str, Any]):
         """Met à jour une entité (style TypeORM)"""
-        update_json = json.dumps(update_data)
+        update_json = json_dumps(update_data)
         result = self._api.Update(self.entity_class.__name__, id, update_json)
         if result:
             raise Exception(f"Update error: {result}")
@@ -211,22 +280,35 @@ class Repository:
             raise Exception(f"Delete error: {result}")
 
     def _entity_to_dict(self, entity) -> Dict[str, Any]:
-        """Convertit une entité en dictionnaire"""
-        result = {}
-        for attr_name, col_meta in self.entity_class._takeo_columns.items():
-            if hasattr(entity, attr_name):
-                value = getattr(entity, attr_name)
-                if value is not None:
-                    result[col_meta["name"]] = value
-        return result
+        """Convertit une entité en dictionnaire - optimisé"""
+        # Cache column mapping for better performance
+        if not hasattr(self, "_column_mapping"):
+            self._column_mapping = {
+                attr_name: col_meta["name"]
+                for attr_name, col_meta in self.entity_class._takeo_columns.items()
+            }
+
+        # Fast dict comprehension instead of loop
+        return {
+            self._column_mapping[attr_name]: getattr(entity, attr_name)
+            for attr_name in self._column_mapping
+            if hasattr(entity, attr_name) and getattr(entity, attr_name) is not None
+        }
 
     def _dict_to_entity(self, data: Dict[str, Any]):
-        """Convertit un dictionnaire en entité"""
+        """Convertit un dictionnaire en entité - optimisé"""
+        # Cache reverse column mapping
+        if not hasattr(self, "_reverse_column_mapping"):
+            self._reverse_column_mapping = {
+                col_meta["name"]: attr_name
+                for attr_name, col_meta in self.entity_class._takeo_columns.items()
+            }
+
         entity = self.entity_class()
-        for attr_name, col_meta in self.entity_class._takeo_columns.items():
-            column_name = col_meta["name"]
-            if column_name in data:
-                setattr(entity, attr_name, data[column_name])
+        # Fast batch setattr
+        for column_name, value in data.items():
+            if column_name in self._reverse_column_mapping:
+                setattr(entity, self._reverse_column_mapping[column_name], value)
         return entity
 
 
