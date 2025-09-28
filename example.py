@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-"""Takeo-ORM - Exemple complet T        # Connexion TypeORM-style avec variables d'environnement
-connection = createConnection(
-    host=os.getenv("DB_HOST", "localhost"),
-    port=int(os.getenv("DB_PORT", 5432)),
-    user=os.getenv("DB_USER", "postgres"),
-    password=os.getenv("DB_PASSWORD", "password"),
-    database=os.getenv("DB_NAME", "orm"),
-    sslmode="disable"
-)ke"""
 
 import os
 from takeo import (
