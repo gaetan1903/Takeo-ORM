@@ -4,8 +4,18 @@ Test simple Takeo-ORM
 Ce test utilise l'API Python de Takeo-ORM (Repository, Entity, Connection)
 """
 
-import sys
+import os, sys
 from pathlib import Path
+
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    print(
+        "[Warning] python-dotenv not installed, using system environment variables only"
+    )
 
 # Ajouter le dossier python à sys.path
 repo_root = Path(__file__).parent.resolve()
@@ -64,14 +74,13 @@ class Post:
 def get_test_config():
     """Configuration de base de données pour le test"""
     return ConnectionConfig(
-        **{
-            "host": "talent-tambatra.com",
-            "port": 5432,
-            "user": "postgres",
-            "password": "p0s_gr3s",
-            "database": "takeo_orm",
-            "sslmode": "disable",
-        }
+        # get in env or use defaults
+        host=os.getenv("DB_HOST", "localhost"),
+        port=int(os.getenv("DB_PORT", "5432")),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASSWORD", ""),
+        database=os.getenv("DB_NAME", "postgres"),
+        sslmode=os.getenv("DB_SSLMODE", "disable"),
     )
 
 
