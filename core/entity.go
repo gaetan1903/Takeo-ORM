@@ -41,10 +41,24 @@ func (r *EntityRegistry) RegisterEntity(entityType reflect.Type, tableName strin
 	r.entities[entityType.Name()] = metadata
 }
 
+// RegisterEntityByName registers an entity by name (for high-level API)
+func (r *EntityRegistry) RegisterEntityByName(entityName string, metadata *EntityMetadata) {
+	r.entities[entityName] = metadata
+}
+
 // GetEntity returns entity metadata by type name
 func (r *EntityRegistry) GetEntity(typeName string) (*EntityMetadata, bool) {
 	entity, exists := r.entities[typeName]
 	return entity, exists
+}
+
+// GetEntityGopy returns entity metadata by type name (gopy-compatible version)
+func (r *EntityRegistry) GetEntityGopy(typeName string) (*EntityMetadata, error) {
+	entity, exists := r.entities[typeName]
+	if !exists {
+		return nil, fmt.Errorf("entity %s not found", typeName)
+	}
+	return entity, nil
 }
 
 // ExtractEntityMetadata extracts metadata from a struct using reflection

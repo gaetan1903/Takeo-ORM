@@ -114,6 +114,52 @@ func (orm *TakeoORM) CreateEntity(typeName string, values map[string]interface{}
 	return err
 }
 
+// CreateEntitiesBatch creates multiple entities in a single transaction (batch operation)
+func (orm *TakeoORM) CreateEntitiesBatch(typeName string, entitiesData []map[string]interface{}) error {
+	if len(entitiesData) == 0 {
+		return nil
+	}
+
+	metadata, exists := orm.registry.GetEntity(typeName)
+	if !exists {
+		return fmt.Errorf("entity %s not registered", typeName)
+	}
+
+	// Start transaction for better performance
+	tx, err := orm.db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Prepare statement for reuse
+	query := metadata.BuildInsertQuery()
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// Execute for each entity
+	for _, values := range entitiesData {
+		var queryValues []interface{}
+		for _, colName := range metadata.ColumnOrder {
+			col := metadata.Columns[colName]
+			if !col.IsAutoIncrement {
+				if val, exists := values[colName]; exists {
+					queryValues = append(queryValues, val)
+				}
+			}
+		}
+		
+		if _, err := stmt.Exec(queryValues...); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 // FindEntityByID finds an entity by its primary key
 func (orm *TakeoORM) FindEntityByID(typeName string, id interface{}) (map[string]interface{}, error) {
 	metadata, exists := orm.registry.GetEntity(typeName)
@@ -221,4 +267,40 @@ func (orm *TakeoORM) DeleteEntity(typeName string, id interface{}) error {
 	query := metadata.BuildDeleteQuery()
 	_, err := orm.db.conn.Exec(query, id)
 	return err
+}
+
+// DeleteEntitiesBatch deletes multiple entities by their primary keys in a single transaction
+func (orm *TakeoORM) DeleteEntitiesBatch(typeName string, ids []interface{}) error {
+	if len(ids) == 0 {
+		return nil
+	}
+
+	metadata, exists := orm.registry.GetEntity(typeName)
+	if !exists {
+		return fmt.Errorf("entity %s not registered", typeName)
+	}
+
+	// Start transaction for better performance
+	tx, err := orm.db.conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Prepare statement for reuse
+	query := metadata.BuildDeleteQuery()
+	stmt, err := tx.Prepare(query)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	// Execute for each ID
+	for _, id := range ids {
+		if _, err := stmt.Exec(id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }

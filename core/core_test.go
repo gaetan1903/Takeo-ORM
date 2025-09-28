@@ -44,7 +44,7 @@ func TestEntityRegistryBasics(t *testing.T) {
 	registry := NewEntityRegistry()
 
 	if registry == nil {
-		t.Error("Expected registry to be created")
+		t.Fatal("Expected registry to be created, got nil")
 	}
 
 	// Test entity registration and retrieval
