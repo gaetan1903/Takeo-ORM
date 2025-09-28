@@ -1,8 +1,27 @@
 # Takeo-ORM Makefile
 
+# Detect OS
+UNAME_S := $(shell uname -s 2>/dev/null || echo "Windows")
+ifeq ($(UNAME_S),Linux)
+    OS = linux
+    EXT = .so
+    MKDIR = mkdir -p
+    RM = rm -rf
+else ifeq ($(UNAME_S),Darwin)
+    OS = darwin
+    EXT = .dylib
+    MKDIR = mkdir -p
+    RM = rm -rf
+else
+    OS = windows
+    EXT = .dll
+    MKDIR = if not exist "$(dir $@)" mkdir "$(dir $@)"
+    RM = if exist "$1" rmdir /s /q "$1"
+endif
+
 # Go variables
 GO_MODULE = github.com/gaetan1903/Takeo-ORM
-GO_BINARY = bin/takeo
+GO_BINARY = bin/takeo$(if $(filter windows,$(OS)),.exe,)
 GOPY_MODULE = takeo_core
 
 # Python variables
@@ -20,21 +39,22 @@ install-deps:
 	go mod tidy
 	@echo "Installing Python dependencies..."
 	$(PYTHON) -m pip install -r requirements.txt
-	@echo "Installing gopy (if not already installed)..."
-	go install github.com/go-python/gopy@latest
+	@echo "Installing gopy (latest version)..."
+	go get github.com/go-python/gopy@latest
+	go install github.com/go-python/gopy
 
 # Build Go binary
 .PHONY: build-go
 build-go:
-	@echo "Building Go binary..."
-	mkdir -p bin
+	@echo "Building Go binary for $(OS)..."
+	$(MKDIR) bin
 	go build -o $(GO_BINARY) ./cmd/main.go
 
 # Generate Python bindings using gopy
 .PHONY: build-bindings
 build-bindings:
-	@echo "Generating Python bindings with gopy..."
-	mkdir -p python/bindings
+	@echo "Generating Python bindings with gopy for $(OS)..."
+	$(MKDIR) python/bindings
 	gopy build -output=python/bindings -name=$(GOPY_MODULE) ./core
 
 # Build everything

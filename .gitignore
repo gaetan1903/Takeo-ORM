@@ -133,6 +133,7 @@ go.work
 # Gopy generated files
 gopy_gen/
 takeo_core.py
+python/bindings/
 
 # IDE
 .vscode/
@@ -149,3 +150,4 @@ takeo_core.py
 .Trashes
 ehthumbs.db
 Thumbs.db
+bin/
