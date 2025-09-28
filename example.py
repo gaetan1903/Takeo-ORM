@@ -1,372 +1,171 @@
-"""
-Test simple Takeo-ORM
+#!/usr/bin/env python3
+"""Takeo-ORM - Exemple complet T        # Connexion TypeORM-style avec variables d'environnement
+connection = createConnection(
+    host=os.getenv("DB_HOST", "localhost"),
+    port=int(os.getenv("DB_PORT", 5432)),
+    user=os.getenv("DB_USER", "postgres"),
+    password=os.getenv("DB_PASSWORD", "password"),
+    database=os.getenv("DB_NAME", "orm"),
+    sslmode="disable"
+)ke"""
 
-Ce test utilise l'API Python de Takeo-ORM (Repository, Entity, Connection)
-"""
-
-import os, sys
-from pathlib import Path
-
-# Load environment variables from .env file
-try:
-    from dotenv import load_dotenv
-
-    load_dotenv()
-except ImportError:
-    print(
-        "[Warning] python-dotenv not installed, using system environment variables only"
-    )
-
-# Ajouter le dossier python à sys.path
-repo_root = Path(__file__).parent.resolve()
-python_dir = repo_root / "python"
-
-if str(python_dir) not in sys.path:
-    sys.path.insert(0, str(python_dir))
-
-print(f"[Test] Répertoire Python: {python_dir}")
-
-# Import de l'API Takeo-ORM haut niveau
-try:
-    from takeo_orm import (
-        Entity,
-        Column,
-        PrimaryKey,
-        Repository,
-        Connection,
-        ConnectionConfig,
-        ColumnType,
-    )
-    from takeo_orm.connection import set_connection
-
-    print(f"[Test] ✓ Import de l'API Takeo-ORM réussi")
-
-except ImportError as e:
-    print(f"[Test] ✗ Erreur import Takeo-ORM: {e}")
-
-    print(f"[Test] Vérifiez que les bindings sont présents dans python/bindings/")
-
-    sys.exit(1)
+import os
+from takeo import (
+    Entity,
+    PrimaryGeneratedColumn,
+    Column,
+    createConnection,
+)
 
 
-# Définition des entités avec décorateurs
-@Entity(table_name="users")
+@Entity("users")
 class User:
-    """Entité User avec décorateurs"""
+    def __init__(self):
+        self.id = None
+        self.name = None
+        self.email = None
+        self.age = None
 
-    id: int = PrimaryKey(auto_increment=True)
-    name: str = Column(nullable=True)
-    email: str = Column(nullable=False)
-    age: int = Column(nullable=True, default=25)
+    id = PrimaryGeneratedColumn()
+    name = Column("VARCHAR(100)", nullable=False)
+    email = Column("VARCHAR(255)", unique=True, nullable=False)
+    age = Column("INTEGER")
+
+    def __str__(self):
+        return f"User(id={self.id}, name='{self.name}', email='{self.email}', age={self.age})"
 
 
-@Entity(table_name="posts")
+@Entity("posts")
 class Post:
-    """Entité Post avec décorateurs"""
-
-    id: int = PrimaryKey(auto_increment=True)
-    user_id: int = Column(nullable=False)
-    title: str = Column(nullable=False)
-    content: str = Column(nullable=True)
-
-
-# Configuration de test (modifiez selon votre base de données)
-def get_test_config():
-    """Configuration de base de données pour le test"""
-    return ConnectionConfig(
-        # get in env or use defaults
-        host=os.getenv("DB_HOST", "localhost"),
-        port=int(os.getenv("DB_PORT", "5432")),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", ""),
-        database=os.getenv("DB_NAME", "postgres"),
-        sslmode=os.getenv("DB_SSLMODE", "disable"),
-    )
-
-
-def test_add_user(user_repo, name, email, age=None):
-    """Test d'ajout d'un utilisateur avec Repository"""
-    print(f"[Test] Ajout utilisateur: {name} ({email})")
-
-    try:
-        # Créer un utilisateur
-        user = User()
-        user.name = name
-        user.email = email
-        user.age = age or 25
-
-        # Sauvegarder avec le repository
-        user_repo.save(user)
-        print(f"[Test] ✓ Utilisateur sauvegardé: {name}")
-
-        # Récupérer l'utilisateur créé pour obtenir son ID généré
-        # On cherche par email puisque c'est unique
-        print(f"[Test] Recherche de l'ID généré pour {email}...")
-
-        all_users = user_repo.find_all()
-        print(f"[Test] Nombre total d'utilisateurs: {len(all_users)}")
-
-        for i, u in enumerate(all_users):
-            user_email = getattr(u, "email", "N/A")
-            user_id = getattr(u, "id", "N/A")
-            print(f"[Test]   User {i+1}: email={user_email}, id={user_id}")
-
-            if hasattr(u, "email") and u.email == email:
-                print(f"[Test] ✓ ID généré pour {name}: {getattr(u, 'id', 'N/A')}")
-
-                return u
-
-        print(f"[Test] ⚠ Utilisateur avec email {email} non trouvé dans la liste")
-
-        return user
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur création utilisateur: {e}")
-
-        return None
-
-
-def test_add_post(post_repo, user_id, title, content):
-    """Test d'ajout d'un post avec Repository"""
-    print(f"[Test] Ajout post: '{title}' pour user_id={user_id}")
-
-    try:
-        # Créer un post
-        post = Post()
-        post.user_id = user_id
-        post.title = title
-        post.content = content
-
-        # Sauvegarder avec le repository
-        post_repo.save(post)
-        print(f"[Test] ✓ Post sauvegardé: {title}")
-
-        return post
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur création post: {e}")
-
-        return None
-
-
-def test_find_user_by_id(user_repo, user_id):
-    """Test de recherche d'un utilisateur par ID"""
-    print(f"[Test] Recherche utilisateur ID: {user_id}")
-
-    try:
-        user = user_repo.find_by_id(user_id)
-        if user:
-            print(f"[Test] ✓ Utilisateur trouvé: {user.name} ({user.email})")
-
-            return user
-        else:
-            print(f"[Test] ✗ Utilisateur ID={user_id} non trouvé")
-
-            return None
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur recherche utilisateur: {e}")
-
-        return None
-
-
-def test_find_all_users(user_repo):
-    """Test de récupération de tous les utilisateurs"""
-    print(f"[Test] Récupération de tous les utilisateurs")
-
-    try:
-        users = user_repo.find_all()
-        print(f"[Test] ✓ {len(users)} utilisateur(s) trouvé(s):")
-
-        for i, user in enumerate(users):
-            # Handle age display properly
-            age_display = (
-                user.age if hasattr(user, "age") and user.age is not None else "N/A"
-            )
-            print(f"[Test]   {i+1}. {user.name} ({user.email}) - Age: {age_display}")
-
-        return users
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur récupération utilisateurs: {e}")
-
-        return []
-
-
-def test_update_user(user_repo, user_id, new_name=None, new_age=None):
-    """Test de mise à jour d'un utilisateur"""
-    print(f"[Test] Mise à jour utilisateur ID: {user_id}")
-
-    try:
-        # D'abord récupérer l'utilisateur
-        user = user_repo.find_by_id(user_id)
-        if not user:
-            print(f"[Test] ✗ Utilisateur ID={user_id} non trouvé pour mise à jour")
-
-            return False
-
-        # Modifier les données
-        if new_name:
-            user.name = new_name
-        if new_age:
-            user.age = new_age
-
-        # Sauvegarder les modifications
-        user_repo.update(user)
-        print(f"[Test] ✓ Utilisateur mis à jour: {user.name}")
-
-        return True
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur mise à jour utilisateur: {e}")
-
-        return False
-
-
-def test_crud_scenarios(connection):
-    """Test des scénarios CRUD avec l'API haut niveau - Pattern TypeORM"""
-    print(f"\n[Test] === Scénarios CRUD avec Repository (Pattern TypeORM) ===")
-
-    try:
-        # PATTERN TYPEORM: Récupérer les repositories via la connexion
-        # au lieu de les créer directement
-        user_repo = connection.get_repository(User)
-        post_repo = connection.get_repository(Post)
-        print(f"[Test] ✓ Repositories récupérés via la connexion (comme TypeORM)")
-
-        # Scénario 1: Créer des utilisateurs
-        print(f"\n[Test] -- Scénario 1: Création d'utilisateurs --")
-
-        # Utiliser des emails uniques avec timestamp pour éviter les doublons
-        import time
-
-        timestamp = int(time.time())
-        alice = test_add_user(
-            user_repo, "Alice Dupont", f"alice_{timestamp}@example.com", 30
-        )
-        bob = test_add_user(user_repo, "Bob Martin", f"bob_{timestamp}@example.com", 25)
-        charlie = test_add_user(
-            user_repo, "Charlie Brown", f"charlie_{timestamp}@example.com", 35
-        )
-
-        # Scénario 2: Créer des posts (utiliser les vrais IDs)
-        print(f"\n[Test] -- Scénario 2: Création de posts --")
-
-        # Récupérer les IDs réels des utilisateurs créés
-        alice_id = getattr(alice, "id", None) if alice else None
-        bob_id = getattr(bob, "id", None) if bob else None
-
-        if alice_id:
-            test_add_post(
-                post_repo, alice_id, "Premier post d'Alice", "Contenu du premier post"
-            )
-            test_add_post(
-                post_repo, alice_id, "Deuxième post d'Alice", "Alice écrit encore"
-            )
-        else:
-            print(f"[Test] ⚠ Alice ID non trouvé, posts ignorés")
-
-        if bob_id:
-            test_add_post(
-                post_repo, bob_id, "Hello World de Bob", "Bob dit bonjour au monde"
-            )
-        else:
-            print(f"[Test] ⚠ Bob ID non trouvé, post ignoré")
-
-        # Scénario 3: Recherche d'utilisateurs (utiliser les vrais IDs)
-        print(f"\n[Test] -- Scénario 3: Recherche d'utilisateurs --")
-
-        alice_id = getattr(alice, "id", None) if alice else None
-        if alice_id:
-            test_find_user_by_id(user_repo, alice_id)
-        else:
-            print(f"[Test] ⚠ Alice ID non trouvé, recherche ignorée")
-
-        test_find_user_by_id(user_repo, 999)  # N'existe pas
-
-        # Scénario 4: Liste de tous les utilisateurs
-        print(f"\n[Test] -- Scénario 4: Liste de tous les utilisateurs --")
-
-        test_find_all_users(user_repo)
-
-        # Scénario 5: Mise à jour d'un utilisateur (utiliser le vrai ID)
-        print(f"\n[Test] -- Scénario 5: Mise à jour d'utilisateur --")
-
-        alice_id = getattr(alice, "id", None) if alice else None
-        if alice_id:
-            test_update_user(
-                user_repo, alice_id, new_name="Alice Dupont-Smith", new_age=31
-            )
-            # Vérifier la mise à jour
-            test_find_user_by_id(user_repo, alice_id)
-        else:
-            print(f"[Test] ⚠ Alice ID non trouvé, mise à jour ignorée")
-
-        print(f"\n[Test] ✓ Tous les tests CRUD terminés !")
-
-        return True
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur durant les tests CRUD: {e}")
-
-        return False
+    def __init__(self):
+        self.id = None
+        self.title = None
+        self.content = None
+        self.author_id = None
+        self.published = None
+
+    id = PrimaryGeneratedColumn()
+    title = Column("VARCHAR(200)", nullable=False)
+    content = Column("TEXT")
+    author_id = Column("INTEGER", nullable=False)
+    published = Column("BOOLEAN", default="false")
+
+    def __str__(self):
+        return f"Post(id={self.id}, title='{self.title}', author_id={self.author_id})"
 
 
 def main():
-    """Fonction principale du test"""
-    print(f"[Test] === Test Takeo-ORM avec API Repository ===")
+    print("🚀 TAKEO-ORM - EXEMPLE COMPLET")
+    print("=" * 50)
+    print("Syntaxe TypeORM + Performance Go")
 
-    # Configuration de la connexion
-    config = get_test_config()
-    print(
-        f"[Test] Configuration: {config.user}@{config.host}:{config.port}/{config.database}"
-    )
-
-    # Créer et tester la connexion
+    connection = None
     try:
-        connection = Connection(config)
-        connection.connect()
-        print(f"[Test] ✓ Connexion établie")
+        # TypeORM-style connection with environment variables
+        connection = createConnection(
+            host=os.getenv("DB_HOST", "localhost"),
+            port=int(os.getenv("DB_PORT", 5432)),
+            user=os.getenv("DB_USER", "postgres"),
+            password=os.getenv("DB_PASSWORD", "password"),
+            database=os.getenv("DB_NAME", "orm"),
+            sslmode=os.getenv("DB_SSLMODE", "disable"),
+        )
+        print("✅ Connexion etablie")
 
-        # Test de ping
-        if connection.ping():
-            print(f"[Test] ✓ Ping réussi")
+        # Repositories TypeORM-style
+        userRepo = connection.getRepository(User)
+        postRepo = connection.getRepository(Post)
 
-        else:
-            print(f"[Test] ✗ Ping échoué")
+        # Tables
+        print("📋 Creation des tables...")
+        create_user_result = connection._api.CreateTable("User")
+        create_post_result = connection._api.CreateTable("Post")
+        print(f"   User table result: {create_user_result}")
+        print(f"   Post table result: {create_post_result}")
+        print("✅ Tables creees")
 
-            return
+        # === DEMO CRUD ===
+        print("\n📝 Creation des donnees...")
+
+        # Créer utilisateurs
+        user1 = User()
+        user1.name = "Alice Dupont"
+        user1.email = "alice@example.com"
+        user1.age = 28
+        saved_user1 = userRepo.save(user1)
+        print(f"   👤 {saved_user1}")
+
+        user2 = User()
+        user2.name = "Bob Martin"
+        user2.email = "bob@example.com"
+        user2.age = 32
+        saved_user2 = userRepo.save(user2)
+        print(f"   👤 {saved_user2}")
+
+        # Créer posts
+        post1 = Post()
+        post1.title = "Introduction a Takeo-ORM"
+        post1.content = "Un ORM performant..."
+        post1.author_id = saved_user1.id
+        post1.published = True
+        saved_post1 = postRepo.save(post1)
+        print(f"   📄 {saved_post1}")
+
+        post2 = Post()
+        post2.title = "Performance Go-Python"
+        post2.content = "Bindings optimises..."
+        post2.author_id = saved_user2.id
+        post2.published = False
+        saved_post2 = postRepo.save(post2)
+        print(f"   📄 {saved_post2}")
+
+        # === LECTURE ===
+        print("\n📖 Lecture des donnees...")
+        print("   Debug: Appel userRepo.find()...")
+        all_users = userRepo.find()
+        print("   Debug: Appel postRepo.find()...")
+        all_posts = postRepo.find()
+        print(f"   Utilisateurs: {len(all_users)} - {all_users}")
+        print(f"   Posts: {len(all_posts)} - {all_posts}")
+
+        # FindOne
+        user = userRepo.findOne(saved_user1.id)
+        if user:
+            print(f"   User ID 1: {user}")
+
+        # === UPDATE ===
+        print("\n✏️  Mise a jour...")
+        userRepo.update(saved_user1.id, {"age": 29})
+        updated_user = userRepo.findOne(saved_user1.id)
+        print(f"   Age mis a jour: {updated_user}")
+
+        # === DELETE ===
+        print("\n🗑️  Suppression...")
+        postRepo.delete(saved_post2.id)
+        remaining_posts = postRepo.find()
+        print(f"   Posts restants: {len(remaining_posts)}")
+
+        print(f"\n" + "=" * 50)
+        print("🎉 DEMONSTRATION TERMINEE!")
+        print("✨ Takeo-ORM: TypeORM + Go Performance")
+        print("=" * 50)
 
     except Exception as e:
-        print(f"[Test] ✗ Erreur de connexion: {e}")
-        print(f"[Test] Vérifiez votre configuration dans get_test_config()")
-        return
+        print(f"❌ Erreur: {e}")
+        import traceback
 
-    # Tests CRUD avec Repository
-    try:
-        crud_success = test_crud_scenarios(connection)
+        traceback.print_exc()
 
-        if crud_success:
-            print(f"\n[Test] ✓ Tous les tests sont réussis !")
-        else:
-            print(f"\n[Test] ✗ Certains tests ont échoué")
-
-    except Exception as e:
-        print(f"\n[Test] ✗ Erreur lors des tests: {e}")
-
-    # Fermeture propre
-    try:
-        connection.close()
-        print(f"[Test] ✓ Connexion fermée proprement")
-
-    except Exception as e:
-        print(f"[Test] ✗ Erreur fermeture: {e}")
-
-    print(f"\n[Test] === Fin des tests ===")
-    print(f"[Test] Note: Ce test utilise l'API Repository de Takeo-ORM,")
-    print(
-        f"[Test] les entités sont enregistrées automatiquement via les décorateurs @Entity !"
-    )
+    finally:
+        if connection:
+            try:
+                connection._api.DropTable("Post")
+                connection._api.DropTable("User")
+                print("\n🧹 Tables supprimees")
+            except:
+                pass
+            connection.close()
+            print("🔌 Connexion fermee")
 
 
 if __name__ == "__main__":
