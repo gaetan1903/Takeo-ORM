@@ -31,11 +31,11 @@ A high-performance Object-Relational Mapper (ORM) for Python with a Go core. Ins
 git clone https://github.com/gaetan1903/Takeo-ORM.git
 cd Takeo-ORM
 
-# Install dependencies
-make install-deps
+# Linux/MacOS
+./build.sh
 
-# Build the project
-make build
+# Windows
+.\build.ps1
 ```
 
 ## 🚀 Quick Start

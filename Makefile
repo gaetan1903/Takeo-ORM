@@ -39,9 +39,17 @@ install-deps:
 	go mod tidy
 	@echo "Installing Python dependencies..."
 	$(PYTHON) -m pip install -r requirements.txt
-	@echo "Installing gopy (latest version)..."
-	go get github.com/go-python/gopy@latest
-	go install github.com/go-python/gopy
+	@echo "Installing required developer tools..."
+	$(MAKE) install-tools
+
+# Install Go development tools
+.PHONY: install-tools
+install-tools:
+	@echo "Installing gopy and goimports..."
+	# Install gopy binary
+	go install github.com/go-python/gopy@v0.4.10
+	# Install goimports for formatting
+	go install golang.org/x/tools/cmd/goimports@latest
 
 # Build Go binary
 .PHONY: build-go
