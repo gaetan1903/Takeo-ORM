@@ -112,9 +112,7 @@ def main():
 
         # === LECTURE ===
         print("\n📖 Lecture des donnees...")
-        print("   Debug: Appel userRepo.find()...")
         all_users = userRepo.find()
-        print("   Debug: Appel postRepo.find()...")
         all_posts = postRepo.find()
         print(f"   Utilisateurs: {len(all_users)} - {all_users}")
         print(f"   Posts: {len(all_posts)} - {all_posts}")

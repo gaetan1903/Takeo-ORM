@@ -157,7 +157,7 @@ go.work
 # Gopy generated files
 gopy_gen/
 takeo_core.py
-python/bindings/
+takeo/core/
 
 # IDE
 .vscode/
